@@ -5,4 +5,4 @@ def main():
     return 0
 
 if name == "main":
-main()
+    main()

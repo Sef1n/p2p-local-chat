@@ -1,3 +1,3 @@
 class Message:
     def __init__:
-    self.peers = {} # {(ip, port) : {'name':'name'}}
+        self.foo = 0
