@@ -1,5 +1,8 @@
+from PeerModule import Peer
+from MessagingModule import Message
+
 def main():
-print("Hello, CS50!")
+    return 0
 
 if name == "main":
 main()
