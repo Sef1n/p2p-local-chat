@@ -1,22 +1,24 @@
 import threading #TODO
+import socket
 
 class Peer:
-    def __init__:
+    def __init__(self, udp_port=0):
+        self.udp_port = udp_port
         self.peers = {} # {(ip, port):{'name':'name'}}
-        self.broadcast_port = 67
 
     # Start point    
     def start(self):
-        thread_listen = threading.Thread(target=self.listen_broadcast)
-        thread_discover = threading.Thread(target=self.discover_broadcast)
+        self.discover_sock = socket.socket()
+        self.discover_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.discover_sock.bind('', self.udp_port)
+        # Start discovering
+        listen_broadcast()
 
-        thread_listen.start()
-        thread_discover.start()
-
-    # 1st thread
     def listen_broadcast(self):
-        pass
-
-    # 2nd thread
-    def discover_broadcast(self):
-        pass
+        While True:
+            data, addr = self.discover_sock.recvform(1024)
+            if data = b'PING': #TODO DATA STRUCT
+                response = f'PONG {self.my_nick} {self.my_addr}'.encode()
+                sock.send(response, addr)
+            elif data = b'PONG':
+                continue #TODO ADD CONNECTION
