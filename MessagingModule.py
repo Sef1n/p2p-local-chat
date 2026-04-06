@@ -5,20 +5,8 @@ class Message:
  
     def start(self):
         self.data_sock = socket.socket()
-        self.discover_sock = socket.socket()
-        # Def opts
         self.data_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.discover_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
- 
         self.data_sock.bind('', self.tcp_port)
-        self.discover_sock.bind('', self.udp_port)
- 
-        # Threads
-        thread_listen = threading.Thread(target=self.listen_broadcast)
-        thread_discover = threading.Thread(target=self.discover_broadcast)
- 
-        thread_listen.start()
-        thread_discover.start()
  
     # 1st thread
     def listen_broadcast(self):
