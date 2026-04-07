@@ -2,7 +2,8 @@ import threading
 
 class Connections:
     def __init__:
-        self.connections = {#(ip, tcp_port):{nick:nick ...}}
+        # {(ip, tcp_port):{nick:nick ...}}
+        self.connections = {}
         self.lock = threading.RLock()
 
     def add_or_update(self, ip, tcp_port, nick):
