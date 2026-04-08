@@ -1,43 +1,62 @@
 import threading #TODO
 import socket
+import time
 
-from ConnectionsModule import Connections
+class Peer:
+    def __init__(self, connections, user):
+        self.udp_port = user.get_udp_port()
+        self.tcp_port = user.get_tcp_port()
+        self.connections = connections
 
-class Peers:
-    def __init__(self, udp_port=9999, tcp_port=8000, my_nick):
-        self.udp_port = udp_port
-        self.tcp_port = tcp_port
-        self.my_nick = my_nick
-        # ping = f'PING'.encode()
+        self.my_nick = user.get_my_nick()
 
-
-
-    def get_my_addr(self):
-            hostname = socket.gethostname()
-            local_ip = socket.gethostbyname(hostname)
-            return local_ip
+        self.ping = f'PING'.encode()
+        self.pong = f'PONG:{self.tcp_port}:{self.my_nick}'.encode()
+        self.bye = f'BYE'.encode()
 
     def listen_broadcast(self):
-        ping = f'PING:{self.my_nick}:{self.tcp_port}'.encode()
-        pong = f'PONG:{self.my_nick}:{self.tcp_port}'.encode()
-
         while True:
-            # TODO VALIDATE
-            data, addr = self.discover_sock.recvform(1024)
-            data = data.decode()
-            data = data.split(':')
-
+            data, addr = self.sock.recvfrom(1024)
+            # VALIDATE
+            try:
+                data = data.decode()
+                data = data.split(':')
+            except UnicodeDecodeError:
+                continue
+            except Exception as error:
+                print(f'ERROR {error}')
+            if not data:
+                continue
             if data[0] == 'PING':
                 # SAY HELLO
-                self.discover_sock.send(pong, addr)
-            elif data[0] == 'PONG':
+                self.sock.sendto(self.pong, addr)
+            elif data[0] == 'BYE':
+                self.connections.remove(addr[0])
+            elif data[0] == 'PONG' and len(data) == 3:
                 # IP, TCP_PORT, NICK
-                Connections.add_or_update(addr[0], data[2], data[1])
+               self.connections.add_or_update(addr[0], data[1], data[2], int(time.time()))
 
-    # Start point    
+    def discover_broadcast(self):
+        while True:
+            self.sock.sendto(self.ping, ('255.255.255.255', self.udp_port))
+            self.connections.cleanup_stale_connections()
+            time.sleep(20)
+
     def start(self):
-        self.discover_sock = socket.socket()
-        self.discover_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.discover_sock.bind('', self.udp_port)
-        # Start discovering
-        listen_broadcast()
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self.sock.bind(('', self.udp_port))
+        # PING
+        self.ping_thread = threading.Thread(target=self.discover_broadcast, daemon=True) # Ends with main
+        # PONG
+        self.listen_thread = threading.Thread(target=self.listen_broadcast, daemon=True)
+        # Start
+        self.ping_thread.start()
+        self.listen_thread.start()
+
+    def say_bye(self):
+        return 0
+
+    def stop(self):
+        return 0
