@@ -7,6 +7,7 @@ class Peer:
         self.udp_port = user.get_udp_port()
         self.tcp_port = user.get_tcp_port()
         self.connections = connections
+        self.running = False
 
         self.my_nick = user.get_my_nick()
 
@@ -15,16 +16,20 @@ class Peer:
         self.bye = f'BYE'.encode()
 
     def listen_broadcast(self):
-        while True:
+        while self.running:
             data, addr = self.sock.recvfrom(1024)
             # VALIDATE
             try:
                 data = data.decode()
                 data = data.split(':')
+            except OSError:
+                break
             except UnicodeDecodeError:
                 continue
             except Exception as error:
-                print(f'ERROR {error}')
+                if self.running:
+                    print(f'ERROR {error}')
+
             if not data:
                 continue
             if data[0] == 'PING':
@@ -37,7 +42,7 @@ class Peer:
                self.connections.add_or_update(addr[0], data[1], data[2], int(time.time()))
 
     def discover_broadcast(self):
-        while True:
+        while self.running:
             self.sock.sendto(self.ping, ('255.255.255.255', self.udp_port))
             self.connections.cleanup_stale_connections()
             time.sleep(20)
@@ -52,11 +57,26 @@ class Peer:
         # PONG
         self.listen_thread = threading.Thread(target=self.listen_broadcast, daemon=True)
         # Start
+        self.running = True
         self.ping_thread.start()
         self.listen_thread.start()
 
-    def say_bye(self):
-        return 0
-
     def stop(self):
-        return 0
+        print('PEER stopping')
+        self.running = False
+        try:
+            # SAY BYE
+            self.sock.sendto(self.bye, ('255.255.255.255', self.udp_port))
+        except:
+            pass
+        try:
+            self.sock.close()
+        except:
+            pass
+        # DAEMONS
+#        if self.ping_thread and self.ping_thread.is_alive():
+#            self.ping_thread.join(timeout=2.0)
+#        
+#        if self.listen_thread and self.listen_thread.is_alive():
+#            self.listen_thread.join(timeout=2.0)
+        print('[Peer] stopped')
