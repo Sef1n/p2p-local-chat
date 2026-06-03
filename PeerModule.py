@@ -3,13 +3,13 @@ import socket
 import time
 
 class Peer:
-    def __init__(self, connections, user):
+    def __init__(self, connections_table, user):
         self.udp_port = user.get_udp_port()
         self.tcp_port = user.get_tcp_port()
-        self.connections = connections
+        self.connections_table = connections_table
         self.running = False
 
-        self.my_nick = user.get_my_nick()
+        self.my_nick = user.get_nick()
 
         self.ping = f'PING'.encode()
         self.pong = f'PONG:{self.tcp_port}:{self.my_nick}'.encode()
@@ -36,15 +36,15 @@ class Peer:
                 # SAY HELLO
                 self.sock.sendto(self.pong, addr)
             elif data[0] == 'BYE':
-                self.connections.remove(addr[0])
+                self.connections_table.remove(addr[0])
             elif data[0] == 'PONG' and len(data) == 3:
                 # IP, TCP_PORT, NICK
-               self.connections.add_or_update(addr[0], data[1], data[2], int(time.time()))
+               self.connections_table.add_or_update(addr[0], data[1], data[2], int(time.time()))
 
     def discover_broadcast(self):
         while self.running:
             self.sock.sendto(self.ping, ('255.255.255.255', self.udp_port))
-            self.connections.cleanup_stale_connections()
+            self.connections_table.cleanup_stale_connections()
             time.sleep(20)
 
     def start(self):
