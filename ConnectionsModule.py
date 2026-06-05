@@ -11,14 +11,14 @@ class Connections:
             ip: {
                 'tcp_port': int,
                 'nick': str,
-                'last_seen': int,  # timestamp of last PONG
+                'last_seen': int,
                 'history': []      # list of messages
             }
         }
         """
         self.connections = {}
         self.lock = threading.RLock()
-        self.pending_messages = []  # queue of new messages 
+        self.pending_messages = []
 
     # ============ UPDATE ============
     
@@ -26,36 +26,62 @@ class Connections:
         """Add or update a peer in the table"""
         with self.lock:
             if ip in self.connections:
-                # Update existing peer
-                self.connections[ip]['tcp_port'] = tcp_port
+                self.connections[ip]['tcp_port'] = int(tcp_port)
                 self.connections[ip]['nick'] = nick
                 self.connections[ip]['last_seen'] = last_seen
             else:
-                # Add new peer
                 self.connections[ip] = {
-                    'tcp_port': tcp_port,
+                    'tcp_port': int(tcp_port),
                     'nick': nick,
                     'last_seen': last_seen,
-                    'history': []
+                    'history': []  # Will store both incoming and outgoing
                 }
             return self.connections[ip]
 
-    def history_update(self, ip: str, msg: dict):
-        """Add a message to chat history with a specific IP"""
+    def add_message_to_history(self, ip: str, text: str, direction: str, timestamp: float):
+        """Add message to peer's history (both sides)"""
         with self.lock:
             if ip in self.connections:
-                self.connections[ip]['history'].append(msg)
-                # Add to queue for UI
-                self.pending_messages.append((self.connections[ip]['nick'], msg))
-            else:
-                # Peer not in table (e.g., not yet discovered)
-                print(f"Warning: Tried to update history for unknown IP {ip}")
+                if timestamp is None:
+                    timestamp = time.time()
+                
+                self.connections[ip]['history'].append({
+                    'text': text,
+                    'timestamp': timestamp,
+                    'direction': direction  # 'in' or 'out'
+                })
 
-    def update_last_seen(self, ip: str, timestamp: int):
-        """Update last contact timestamp for a peer"""
+    def history_update(self, ip: str, msg: dict):
+        """Add incoming message to history"""
         with self.lock:
             if ip in self.connections:
-                self.connections[ip]['last_seen'] = timestamp
+                text = msg.get('text', '')
+                timestamp = msg.get('timestamp', time.time())
+                sender = msg.get('from', 'Unknown')
+                
+                self.connections[ip]['history'].append({
+                    'text': text,
+                    'timestamp': timestamp,
+                    'direction': 'in',
+                    'from': sender
+                })
+                
+                # Queue for UI
+                self.pending_messages.append((self.connections[ip]['nick'], msg))
+
+    def add_outgoing_message(self, nick: str, text: str):
+        """Record outgoing message in history"""
+        with self.lock:
+            timestamp = time.time()
+            for ip, data in self.connections.items():
+                if data['nick'] == nick:
+                    data['history'].append({
+                        'text': text,
+                        'timestamp': timestamp,
+                        'direction': 'out',
+                        'to': nick
+                    })
+                    break
 
     # ============ DELETE ============
     
@@ -65,7 +91,6 @@ class Connections:
             if ip in self.connections:
                 nick = self.connections[ip]['nick']
                 del self.connections[ip]
-                print(f"[Connections] Removed {nick} ({ip})")
                 return nick
         return None
 
@@ -75,12 +100,11 @@ class Connections:
             for ip, data in list(self.connections.items()):
                 if data['nick'] == nick:
                     del self.connections[ip]
-                    print(f"[Connections] Removed {nick} ({ip})")
                     return ip
         return None
 
     def cleanup_stale_connections(self, timeout_seconds: int = 300):
-        """Remove peers that haven't sent PONG for more than timeout_seconds (default 5 minutes)"""
+        """Remove peers that haven't sent PONG for more than timeout_seconds"""
         with self.lock:
             now = int(time.time())
             stale = []
@@ -91,7 +115,7 @@ class Connections:
             for ip in stale:
                 nick = self.connections[ip]['nick']
                 del self.connections[ip]
-                print(f"[Connections] Cleaned up stale connection: {nick} ({ip})")
+                print(f"[Connections] Cleaned up stale connection: {nick}")
             
             return len(stale)
 
@@ -122,22 +146,33 @@ class Connections:
         with self.lock:
             return [data['nick'] for data in self.connections.values()]
 
-    def get_history(self, nick: str) -> list:
+    def get_history(self, nick: str, limit: int = 50) -> list:
         """Return chat history with a specific user by nickname"""
         with self.lock:
             for ip, data in self.connections.items():
                 if data['nick'] == nick:
-                    return data['history'].copy()
+                    history = data['history'].copy()
+                    if limit:
+                        history = history[-limit:]
+                    return history
         return []
 
-    def get_history_by_ip(self, ip: str) -> list:
-        """Return chat history with a specific user by IP"""
-        with self.lock:
-            if ip in self.connections:
-                return self.connections[ip]['history'].copy()
-        return []
+    def get_full_conversation(self, nick: str) -> list:
+        """Return formatted conversation with timestamps"""
+        history = self.get_history(nick)
+        if not history:
+            return []
+        
+        formatted = []
+        for msg in history:
+            time_str = time.strftime("%H:%M:%S", time.localtime(msg['timestamp']))
+            if msg['direction'] == 'out':
+                formatted.append(f"[{time_str}] [me]: {msg['text']}")
+            else:
+                formatted.append(f"[{time_str}] [{msg.get('from', nick)}]: {msg['text']}")
+        return formatted
 
-    # ============ QUEUE FOR TUI ============
+    # ============ QUEUE FOR UI ============
     
     def get_pending_messages(self) -> list:
         """Return and clear the queue of new messages for UI"""

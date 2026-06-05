@@ -14,7 +14,7 @@ class Messager:
         self.running = True
         self.socket_timeout = 20
         
-        # Queue for TUI thread
+        # Queue for UI thread
         self.message_queue = []
         self.queue_lock = threading.Lock()
 
@@ -24,7 +24,6 @@ class Messager:
         json_bytes = json_str.encode("utf-8")
         sock.send(struct.pack('!I', len(json_bytes)))
         sock.send(json_bytes)
-        sock.close()
 
     def recv_json(self, sock):
         """Receive JSON data from socket"""
@@ -61,9 +60,14 @@ class Messager:
             return False
         
         ip, data = peer_info
-        tcp_port = data['tcp_port']
+        tcp_port = data.get('tcp_port')
+        
+        # Convert port to int if needed
+        if isinstance(tcp_port, str):
+            tcp_port = int(tcp_port)
         
         # Create connection and send
+        sock = None
         try:
             sock = socket.socket()
             sock.settimeout(5)
@@ -76,6 +80,9 @@ class Messager:
                 "timestamp": time.time()
             }, sock)
             
+            # Record outgoing message in history
+            self.connections.add_outgoing_message(receiver_nick, message)
+            
             self._queue_notification(f"Message sent to {receiver_nick}", "success")
             return True
 
@@ -85,6 +92,9 @@ class Messager:
         except Exception as error:
             self._queue_notification(f"Send error: {error}", "error")
             return False
+        finally:
+            if sock:
+                sock.close()
 
     def get_loop(self):
         """Accept incoming TCP connections"""
@@ -151,15 +161,17 @@ class Messager:
     # Start and stop threads
     def start(self):
         """Start TCP server"""
-        self.get_sock = socket.socket()
+        self.get_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.get_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.get_sock.bind(('', self.tcp_port))
         self.get_sock.listen(5)
 
         self.get_loop_thread = threading.Thread(target=self.get_loop, daemon=True)
         self.get_loop_thread.start()
+        print(f"Messager started on port {self.tcp_port}")
 
     def stop(self):
+        """Stop TCP server"""
         print("Messager stopping...")
         self.running = False
         
