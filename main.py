@@ -34,13 +34,10 @@ def print_help_msg():
     print("  list, who        - Show list of available users")
     print("  msg <USER> <TEXT> - Send message to user")
     print("  history <USER>   - Show chat history with user")
-    print("  conv <USER>      - Show full conversation with timestamps")
     print("  quit, q, exit    - Exit chat")
     print("\n[EXAMPLES]")
     print("  msg Vasya Hello, how are you?")
-    print("  msg 1 Hello       (send to first user in list)")
     print("  history Vasya")
-    print("  conv Vasya")
     print("\n" + "=" * 50 + "\n")
 
 
@@ -187,17 +184,7 @@ def main():
                     recipient = subparts[0]
                     message = subparts[1]
                     
-                    # Try to convert number to nickname
-                    if recipient.isdigit():
-                        contacts = connections.get_all_nicks()
-                        idx = int(recipient) - 1
-                        if 0 <= idx < len(contacts):
-                            recipient = contacts[idx]
-                        else:
-                            print(f"[!] Invalid contact number: {recipient}")
-                            print("> ", end="", flush=True)
-                            continue
-                    
+                    # Send message directly by nickname
                     messager.send_message(message, recipient)
                     print("> ", end="", flush=True)
                 
@@ -212,16 +199,16 @@ def main():
                     print_history(connections, recipient)
                     print("> ", end="", flush=True)
                 
-                # Full conversation
-                elif cmd in ['conv', 'conversation']:
-                    if len(parts) < 2:
-                        print("[!] Usage: conv <USER>")
-                        print("> ", end="", flush=True)
-                        continue
-                    
-                    recipient = parts[1]
-                    print_full_conversation(connections, recipient)
-                    print("> ", end="", flush=True)
+                # Full conversation (commented out)
+                # elif cmd in ['conv', 'conversation']:
+                #     if len(parts) < 2:
+                #         print("[!] Usage: conv <USER>")
+                #         print("> ", end="", flush=True)
+                #         continue
+                #     
+                #     recipient = parts[1]
+                #     print_full_conversation(connections, recipient)
+                #     print("> ", end="", flush=True)
                 
                 # Quit
                 elif cmd in ['quit', 'q', 'exit']:
