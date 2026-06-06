@@ -2,7 +2,8 @@ import socket
 import argparse
 import time
 import sys
-import select
+import threading
+from queue import Queue
 
 from UserModule import User
 from PeerModule import Peer
@@ -84,24 +85,6 @@ def print_history(connections, nick, limit=50):
     print(f"{'='*50}\n")
 
 
-def print_full_conversation(connections, nick):
-    """Print full conversation with timestamps"""
-    conversation = connections.get_full_conversation(nick)
-    
-    if not conversation:
-        print(f"\n[i] No messages with {nick}")
-        return
-    
-    print(f"\n{'='*50}")
-    print(f"CONVERSATION WITH {nick.upper()}")
-    print(f"{'='*50}")
-    
-    for line in conversation:
-        print(line)
-    
-    print(f"{'='*50}\n")
-
-
 def print_notification(text: str, level: str = "info"):
     """Print notification"""
     if level == "error":
@@ -115,6 +98,16 @@ def print_notification(text: str, level: str = "info"):
 def print_incoming_message(sender: str, text: str):
     """Print incoming message"""
     print(f"\n[{sender}]: {text}")
+
+
+def input_thread_function(input_queue):
+    """Thread function to read user input"""
+    while True:
+        try:
+            user_input = sys.stdin.readline()
+            input_queue.put(user_input.strip())
+        except:
+            break
 
 
 def main():
@@ -134,9 +127,16 @@ def main():
     print_help_msg()
     print_contacts(connections)
     
+    # Queue for user input
+    input_queue = Queue()
+    
+    # Start input thread
+    input_thread = threading.Thread(target=input_thread_function, args=(input_queue,), daemon=True)
+    input_thread.start()
+    
     # Main loop
-    while True:
-        try:
+    try:
+        while True:
             # Check for incoming messages
             for item in messager.get_messages():
                 if item["type"] == "notification":
@@ -147,10 +147,13 @@ def main():
                 # Redraw prompt
                 print("\n> ", end="", flush=True)
             
-            # Get user input with timeout
-            if select.select([sys.stdin], [], [], 0.1)[0]:
-                user_input = sys.stdin.readline().strip()
-                
+            # Check for user input (non-blocking)
+            try:
+                user_input = input_queue.get_nowait()
+            except:
+                user_input = None
+            
+            if user_input is not None:
                 if not user_input:
                     print("> ", end="", flush=True)
                     continue
@@ -184,7 +187,6 @@ def main():
                     recipient = subparts[0]
                     message = subparts[1]
                     
-                    # Send message directly by nickname
                     messager.send_message(message, recipient)
                     print("> ", end="", flush=True)
                 
@@ -199,17 +201,6 @@ def main():
                     print_history(connections, recipient)
                     print("> ", end="", flush=True)
                 
-                # Full conversation (commented out)
-                # elif cmd in ['conv', 'conversation']:
-                #     if len(parts) < 2:
-                #         print("[!] Usage: conv <USER>")
-                #         print("> ", end="", flush=True)
-                #         continue
-                #     
-                #     recipient = parts[1]
-                #     print_full_conversation(connections, recipient)
-                #     print("> ", end="", flush=True)
-                
                 # Quit
                 elif cmd in ['quit', 'q', 'exit']:
                     print("[i] Goodbye!")
@@ -223,19 +214,14 @@ def main():
             # Small delay to prevent CPU spinning
             time.sleep(0.05)
                 
-        except KeyboardInterrupt:
-            print("\n[i] Goodbye!")
-            break
-        except EOFError:
-            print("\n[i] Goodbye!")
-            break
-        except Exception as e:
-            print(f"\n[!] Error: {e}")
-            print("> ", end="", flush=True)
-    
-    # Cleanup
-    peer.stop()
-    messager.stop()
+    except KeyboardInterrupt:
+        print("\n[i] Goodbye!")
+    except Exception as e:
+        print(f"\n[!] Error: {e}")
+    finally:
+        # Cleanup
+        peer.stop()
+        messager.stop()
 
 
 if __name__ == "__main__":
