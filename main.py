@@ -35,10 +35,14 @@ def print_help_msg():
     print("  list, who        - Show list of available users")
     print("  msg <USER> <TEXT> - Send message to user")
     print("  history <USER>   - Show chat history with user")
+    print("  add <IP> <PORT> <NICK> - Manually add a peer (IP, TCP port, nickname)")
+    print("  rm <USER>        - Remove a peer by nickname")
     print("  quit, q, exit    - Exit chat")
     print("\n[EXAMPLES]")
     print("  msg Vasya Hello, how are you?")
     print("  history Vasya")
+    print("  add 192.168.1.100 8000 Bob")
+    print("  rm Bob")
     print("\n" + "=" * 50 + "\n")
 
 
@@ -105,7 +109,8 @@ def input_thread_function(input_queue):
     while True:
         try:
             user_input = sys.stdin.readline()
-            input_queue.put(user_input.strip())
+            if user_input:
+                input_queue.put(user_input.strip())
         except:
             break
 
@@ -199,6 +204,54 @@ def main():
                     
                     recipient = parts[1]
                     print_history(connections, recipient)
+                    print("> ", end="", flush=True)
+                
+                # Add peer manually
+                elif cmd == 'add':
+                    if len(parts) < 2:
+                        print("[!] Usage: add <IP> <PORT> <NICK>")
+                        print("> ", end="", flush=True)
+                        continue
+                    
+                    subparts = parts[1].split()
+                    if len(subparts) < 3:
+                        print("[!] Usage: add <IP> <PORT> <NICK>")
+                        print("> ", end="", flush=True)
+                        continue
+                    
+                    ip = subparts[0]
+                    tcp_port = int(subparts[1])
+                    nick = subparts[2]
+                    udp_port = 9999  # Default UDP port
+                    last_seen = int(time.time())
+                    
+                    # Add to connections
+                    connections.add_or_update(ip, tcp_port, nick, last_seen)
+                    print(f"[i] Added peer: {nick} ({ip}:{tcp_port})")
+                    print("> ", end="", flush=True)
+                
+                # Remove peer by nickname
+                elif cmd == 'rm':
+                    if len(parts) < 2:
+                        print("[!] Usage: rm <USER>")
+                        print("> ", end="", flush=True)
+                        continue
+                    
+                    nick = parts[1]
+                    result = connections.remove_by_nick(nick)
+                    if result:
+                        print(f"[i] Removed peer: {nick}")
+                    else:
+                        print(f"[!] Peer '{nick}' not found")
+                    print("> ", end="", flush=True)
+                
+                # Refresh / scan for peers (send manual PING)
+                elif cmd == 'refresh' or cmd == 'scan':
+                    print("[i] Refreshing peer list...")
+                    # Send manual PING
+                    peer.sock.sendto(b'PING', ('255.255.255.255', user.get_udp_port()))
+                    time.sleep(0.5)
+                    print_contacts(connections)
                     print("> ", end="", flush=True)
                 
                 # Quit
