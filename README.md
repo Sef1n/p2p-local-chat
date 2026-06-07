@@ -1,11 +1,6 @@
 # P2P Local Chat
 
-#### Video Demo: <https://youtu.be/>
-
-#### GitHub: sef1n
-#### edX: Sef1n
-#### City & Country: Minsk, Belarus
-#### Date: June 7, 2026
+#### Video Demo: https://youtu.be/RCRhFOk5ogY
 
 ## Description
 
@@ -49,17 +44,7 @@ The application consists of several modules that work together:
 **main.py** - User interface and command dispatch:
 - Command-line interface with asynchronous message handling
 - Separate input thread to avoid blocking on Windows
-- Commands: list, msg, history, help, quit
-
-### Technical Highlights
-
-1. **Binary Protocol Design** - Messages are sent with a 4-byte length prefix followed by JSON data, allowing proper message framing over TCP streams.
-
-2. **Thread Safety** - All shared data structures are protected with threading locks to prevent race conditions in multi-threaded environment.
-
-3. **Graceful Shutdown** - Nodes send BYE messages when exiting, allowing other peers to clean up stale connections.
-
-4. **Error Resilience** - Timeout mechanisms prevent hanging connections and zombie threads.
+- Commands: list, msg, history, add, rm, refresh, help, quit
 
 ### File Structure
 project/
@@ -117,6 +102,12 @@ The course scope focuses on networking concepts. Persistent storage could be add
         msg <nick> <text> - Send a message to a user
 
         history <nick> - Show chat history with a user
+
+        add - Add peer manually
+
+        rm - Remove peer by nickname
+
+        refresh / scan - scan for peers (manually send PING)
 
         help - Display help message
 

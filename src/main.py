@@ -5,10 +5,10 @@ import sys
 import threading
 from queue import Queue
 
-from UserModule import User
-from PeerModule import Peer
-from MessagingModule import Messager
-from ConnectionsModule import Connections
+from .userModule import User
+from .peerModule import Peer
+from .messagingModule import Messager
+from .connectionsModule import Connections
 
 
 def parse_args():
